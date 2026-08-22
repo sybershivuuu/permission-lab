@@ -1,4 +1,5 @@
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import os
+import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import re
 import time
@@ -75,7 +76,7 @@ class Handler(BaseHTTPRequestHandler):
         print(f"[{self.log_date_time_string()}] {fmt % args}")
 
 
-server = ThreadingHTTPServer(("127.0.0.1", 8080), Handler)
+server = ThreadingHTTPServer((os.getenv("HOST", "0.0.0.0"), int(os.getenv("PORT", "8080"))), Handler)
 
 print("Serving lab on http://127.0.0.1:8080/")
 print("Captures:", CAPTURES)
