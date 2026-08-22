@@ -1,8 +1,5 @@
-from http.server import os
-import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
-import re
-import time
+import os
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = Path(__file__).resolve().parent
 CAPTURES = ROOT / "captures"
