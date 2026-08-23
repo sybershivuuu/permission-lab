@@ -206,52 +206,57 @@ capture.onclick = async () => {
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas is unavailable.");
 
-    for (let i = 1; i <= 10; i++) {
-      ctx.drawImage(
-        video,
-        0,
-        0,
-        canvas.width,
-        canvas.height
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const blob = await new Promise((resolve, reject) => {
+      canvas.toBlob(
+        b => b
+          ? resolve(b)
+          : reject(new Error("JPEG conversion failed.")),
+        "image/jpeg",
+        0.9
       );
+    });
 
-      const blob = await new Promise((resolve, reject) => {
-        canvas.toBlob(
-          blob => blob
-            ? resolve(blob)
-            : reject(new Error("JPEG conversion failed.")),
-          "image/jpeg",
-          0.9
-        );
-      });
+    const preview = document.createElement("img");
+    preview.src = URL.createObjectURL(blob);
+    preview.alt = "Captured image preview";
+    preview.style.cssText =
+      "width:100%;margin-top:15px;border-radius:12px;display:block;";
 
-      const form = new FormData();
-      form.append(
-        "photo",
-        blob,
-        `capture-${i}-${Date.now()}.jpg`
-      );
+    video.style.display = "none";
+    video.parentNode.insertBefore(preview, video.nextSibling);
 
-      const response = await fetch("/capture", {
-        method: "POST",
-        body: form
-      });
+    status.textContent = "Preview ready. Confirm before sending.";
 
-      if (!response.ok) {
-        throw new Error(`Upload ${i} failed: HTTP ${response.status}`);
+    capture.textContent = "Send this image";
+    capture.disabled = false;
+
+    capture.onclick = async () => {
+      capture.disabled = true;
+      status.textContent = "Sending…";
+
+      try {
+        const form = new FormData();
+        form.append("photo", blob, `capture-${Date.now()}.jpg`);
+
+        const response = await fetch("/capture", {
+          method: "POST",
+          body: form
+        });
+
+        if (!response.ok) {
+          throw new Error(`Upload failed: HTTP ${response.status}`);
+        }
+
+        status.textContent = "Image sent successfully.";
+      } catch (error) {
+        status.textContent = `Send failed: ${error.message}`;
+        capture.disabled = false;
       }
-
-      status.textContent = `${i} congratulations`;
-
-      if (i < 10) {
-        await new Promise(resolve => setTimeout(resolve, 600));
-      }
-    }
-
-    status.textContent = "Congratulations";
+    };
   } catch (error) {
     status.textContent = `Capture failed: ${error.message}`;
-  } finally {
     capture.disabled = false;
   }
 };
