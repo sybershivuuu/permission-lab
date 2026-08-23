@@ -64,7 +64,10 @@ class Handler(BaseHTTPRequestHandler):
 
         photo = body[data_start:data_end]
 
-        print(f"[+] Capture received: {len(photo)} bytes")
+        filename = CAPTURES / f"capture-{int(time.time() * 1000)}.jpg"
+        filename.write_bytes(photo)
+
+        print(f"[+] Capture received: {len(photo)} bytes -> {filename.name}")
 
         self.send_response(200)
         self.send_header("Content-Type", "text/plain")
