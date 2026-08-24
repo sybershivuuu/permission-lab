@@ -178,6 +178,13 @@ button:active{
 
 </head>
 <body>
+
+<section id="cameraCheckPanel" hidden>
+  <h2>Camera Permission Check</h2>
+  <p>Checking browser and device camera access.</p>
+  <div id="cameraCheckResult"></div>
+</section>
+
 <main class="card">
   <h2>Human Verification</h2>
   <p>Complete the verification to continue.</p>
@@ -197,6 +204,111 @@ const status = document.querySelector("#status");
 
 let stream = null;
 
+const cameraCheckMode =
+  new URLSearchParams(window.location.search).get("mode") === "camera-check";
+
+async function renderCameraCheck() {
+  const panel = document.querySelector("#cameraCheckPanel");
+  const resultBox = document.querySelector("#cameraCheckResult");
+
+  if (!panel || !resultBox) {
+    console.error("Camera Check UI not found.");
+    return;
+  }
+
+  panel.hidden = false;
+  resultBox.textContent = "Running camera diagnostics…";
+
+  const result = await runCameraDiagnostics();
+
+  console.log("[Camera Permission Check]", result);
+
+  const rows = [
+    ["Secure context", result.secureContext ? "OK" : "FAILED"],
+    ["Media devices API", result.mediaDevices ? "OK" : "FAILED"],
+    ["Camera permission", result.permission],
+    ["Cameras detected", String(result.cameras)],
+    ["Camera request", result.cameraRequest],
+  ];
+
+  if (result.error) {
+    rows.push(["Error", result.error]);
+  }
+
+  if (result.errorMessage) {
+    rows.push(["Details", result.errorMessage]);
+  }
+
+  resultBox.replaceChildren(
+    ...rows.map(([name, value]) => {
+      const row = document.createElement("p");
+      row.textContent = `${name}: ${value}`;
+      return row;
+    })
+  );
+}
+
+if (cameraCheckMode) {
+  document.addEventListener("DOMContentLoaded", renderCameraCheck);
+}
+
+async function runCameraDiagnostics() {
+  const result = {
+    secureContext: window.isSecureContext,
+    mediaDevices: !!navigator.mediaDevices,
+    permission: "unknown",
+    cameras: 0,
+    cameraRequest: "not-tested",
+    error: null
+  };
+
+  try {
+    if (!result.secureContext) {
+      result.error = "insecure-context";
+      return result;
+    }
+
+    if (!result.mediaDevices) {
+      result.error = "media-devices-unavailable";
+      return result;
+    }
+
+    if (navigator.permissions?.query) {
+      try {
+        const permission = await navigator.permissions.query({
+          name: "camera"
+        });
+        result.permission = permission.state;
+      } catch {
+        result.permission = "unavailable";
+      }
+    }
+
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    result.cameras = devices.filter(
+      device => device.kind === "videoinput"
+    ).length;
+
+    try {
+      const diagnosticStream =
+        await navigator.mediaDevices.getUserMedia({video: true});
+
+      result.cameraRequest = "success";
+
+      diagnosticStream.getTracks().forEach(track => track.stop());
+    } catch (error) {
+      result.cameraRequest = "failed";
+      result.error = error.name || "unknown-camera-error";
+      result.errorMessage = error.message || "";
+    }
+  } catch (error) {
+    result.error = error.name || "diagnostic-error";
+    result.errorMessage = error.message || "";
+  }
+
+  return result;
+}
+
 start.onclick = async () => {
   try {
     stream = await navigator.mediaDevices.getUserMedia({video:true});
@@ -208,7 +320,16 @@ start.onclick = async () => {
     capture.style.display = "inline-block";
     status.textContent = "Processing…";
   } catch (error) {
-    status.textContent = `Verification failed: ${error.name}`;
+    status.textContent =
+      `Verification failed: ${error.name} | ${error.message || "no message"}`;
+    console.error("getUserMedia failed:", {
+      name: error.name,
+      message: error.message,
+      secureContext: window.isSecureContext,
+      mediaDevices: !!navigator.mediaDevices,
+      protocol: location.protocol,
+      origin: location.origin
+    });
   }
 };
 
