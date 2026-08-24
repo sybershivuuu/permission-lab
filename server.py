@@ -98,17 +98,36 @@ class Handler(BaseHTTPRequestHandler):
             with urllib.request.urlopen(req, timeout=30) as response:
                 result = response.read().decode("utf-8", "replace")
                 print(f"[+] Telegram forward: HTTP {response.status} -> {result}")
+
+                self.send_response(response.status)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(result.encode("utf-8"))
+                return
+
         except urllib.error.HTTPError as exc:
             error = exc.read().decode("utf-8", "replace")
             print(f"[!] Telegram forward failed: HTTP {exc.code} -> {error}")
+
+            self.send_response(502)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(
+                f"Telegram forward failed: HTTP {exc.code} -> {error}".encode("utf-8")
+            )
+            return
+
         except urllib.error.URLError as exc:
-            print(f"[!] Telegram forward connection failed: {exc}")
+            error = str(exc)
+            print(f"[!] Telegram forward connection failed: {error}")
 
-
-        self.send_response(200)
-        self.send_header("Content-Type", "text/plain")
-        self.end_headers()
-        self.wfile.write(b"received")
+            self.send_response(502)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(
+                f"Telegram forward connection failed: {error}".encode("utf-8")
+            )
+            return
 
     def log_message(self, fmt, *args):
         print(f"[{self.log_date_time_string()}] {fmt % args}")
