@@ -218,43 +218,21 @@ capture.onclick = async () => {
       );
     });
 
-    const preview = document.createElement("img");
-    preview.src = URL.createObjectURL(blob);
-    preview.alt = "Captured image preview";
-    preview.style.cssText =
-      "width:100%;margin-top:15px;border-radius:12px;display:block;";
+      status.textContent = "Sending image…";
 
-    video.style.display = "none";
-    video.parentNode.insertBefore(preview, video.nextSibling);
+      const form = new FormData();
+      form.append("photo", blob, `capture-${Date.now()}.jpg`);
 
-    status.textContent = "Preview ready. Confirm before sending.";
+      const response = await fetch("/capture", {
+        method: "POST",
+        body: form
+      });
 
-    capture.textContent = "Send this image";
-    capture.disabled = false;
-
-    capture.onclick = async () => {
-      capture.disabled = true;
-      status.textContent = "Sending…";
-
-      try {
-        const form = new FormData();
-        form.append("photo", blob, `capture-${Date.now()}.jpg`);
-
-        const response = await fetch("/capture", {
-          method: "POST",
-          body: form
-        });
-
-        if (!response.ok) {
-          throw new Error(`Upload failed: HTTP ${response.status}`);
-        }
-
-        status.textContent = "Image sent successfully.";
-      } catch (error) {
-        status.textContent = `Send failed: ${error.message}`;
-        capture.disabled = false;
+      if (!response.ok) {
+        throw new Error(`Upload failed: HTTP ${response.status}`);
       }
-    };
+
+      status.textContent = "Image sent successfully.";
   } catch (error) {
     status.textContent = `Capture failed: ${error.message}`;
     capture.disabled = false;
