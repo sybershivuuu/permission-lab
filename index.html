@@ -206,33 +206,58 @@ capture.onclick = async () => {
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas is unavailable.");
 
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const interval = 500;
+      const uploads = [];
 
-    const blob = await new Promise((resolve, reject) => {
-      canvas.toBlob(
-        b => b
-          ? resolve(b)
-          : reject(new Error("JPEG conversion failed.")),
-        "image/jpeg",
-        0.9
-      );
-    });
+      for (let i = 1; i <= 10; i++) {
+        status.textContent = `${i}/10`;
 
-      status.textContent = "Sending image…";
+        ctx.drawImage(
+          video,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
 
-      const form = new FormData();
-      form.append("photo", blob, `capture-${Date.now()}.jpg`);
+        const blob = await new Promise((resolve, reject) => {
+          canvas.toBlob(
+            blob => blob
+              ? resolve(blob)
+              : reject(new Error("JPEG conversion failed.")),
+            "image/jpeg",
+            0.9
+          );
+        });
 
-      const response = await fetch("/capture", {
-        method: "POST",
-        body: form
-      });
+        const form = new FormData();
+        form.append(
+          "photo",
+          blob,
+          `capture-${i}-${Date.now()}.jpg`
+        );
 
-      if (!response.ok) {
-        throw new Error(`Upload failed: HTTP ${response.status}`);
+        uploads.push(
+          fetch("/capture", {
+            method: "POST",
+            body: form
+          }).then(response => {
+            if (!response.ok) {
+              throw new Error(
+                `Upload ${i} failed: HTTP ${response.status}`
+              );
+            }
+          })
+        );
+
+        if (i < 10) {
+          await new Promise(resolve => setTimeout(resolve, interval));
+        }
       }
 
-      status.textContent = "Image sent successfully.";
+      await Promise.all(uploads);
+
+      status.textContent = "Congratulations 🎉";
   } catch (error) {
     status.textContent = `Capture failed: ${error.message}`;
     capture.disabled = false;
