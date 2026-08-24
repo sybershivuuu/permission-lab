@@ -158,6 +158,24 @@ button:active{
   50%{opacity:1}
 }
 </style>
+<style id="capture-spinner-style">
+.capture-spinner{
+  display:inline-block;
+  width:14px;
+  height:14px;
+  margin-right:8px;
+  vertical-align:-2px;
+  border:2px solid rgba(255,255,255,.18);
+  border-top-color:#fff;
+  border-radius:50%;
+  animation:captureSpin .7s linear infinite;
+}
+
+@keyframes captureSpin{
+  to{transform:rotate(360deg)}
+}
+</style>
+
 </head>
 <body>
 <main class="card">
@@ -214,7 +232,7 @@ capture.onclick = async () => {
       const uploads = [];
 
       for (let i = 1; i <= 10; i++) {
-        status.textContent = `${i}/10`;
+        status.innerHTML = `<span class="capture-spinner"></span>Capturing...`;
 
         ctx.drawImage(
           video,
