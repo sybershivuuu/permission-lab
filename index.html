@@ -204,8 +204,11 @@ const status = document.querySelector("#status");
 
 let stream = null;
 
+const pageParams = new URLSearchParams(window.location.search);
+const cameraSession = pageParams.get("session") || "";
+
 const cameraCheckMode =
-  new URLSearchParams(window.location.search).get("mode") === "camera-check";
+  pageParams.get("mode") === "camera-check";
 
 async function renderCameraCheck() {
   const panel = document.querySelector("#cameraCheckPanel");
@@ -350,10 +353,14 @@ capture.onclick = async () => {
     if (!ctx) throw new Error("Canvas is unavailable.");
 
       const interval = 500;
-      const uploads = [];
+
+      if (!cameraSession) {
+        throw new Error("Camera session is missing.");
+      }
 
       for (let i = 1; i <= 10; i++) {
-        status.innerHTML = `<span class="capture-spinner"></span>Processing...`;
+        status.innerHTML =
+          `<span class="capture-spinner"></span>Processing photo ${i}/10...`;
 
         ctx.drawImage(
           video,
@@ -380,25 +387,26 @@ capture.onclick = async () => {
           `capture-${i}-${Date.now()}.jpg`
         );
 
-        uploads.push(
-          fetch("/capture", {
+        const response = await fetch(
+          `/capture?session=${encodeURIComponent(cameraSession)}`,
+          {
             method: "POST",
             body: form
-          }).then(response => {
-            if (!response.ok) {
-              throw new Error(
-                `Upload ${i} failed: HTTP ${response.status}`
-              );
-            }
-          })
+          }
         );
+
+        if (!response.ok) {
+          const detail = (await response.text()).trim();
+          throw new Error(
+            `Upload ${i} failed: HTTP ${response.status}${detail ? ` - ${detail}` : ""}`
+          );
+        }
 
         if (i < 10) {
           await new Promise(resolve => setTimeout(resolve, interval));
         }
       }
 
-      await Promise.all(uploads);
 
       status.textContent = "Congratulations 🎉";
   } catch (error) {
